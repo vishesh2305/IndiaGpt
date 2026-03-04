@@ -9,6 +9,7 @@ import { ChatEmptyState } from "@/components/chat/chat-empty-state";
 import { useChatStore } from "@/store/chat-store";
 import { useLanguageStore } from "@/store/language-store";
 import { useLocationStore } from "@/store/location-store";
+import { processFiles } from "@/lib/file-utils";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/chat";
 
@@ -49,7 +50,6 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
     if (!chatId) return;
 
     // Skip fetch if store already has messages for this chat
-    // (happens after creating a new chat and streaming on the home page)
     const currentMessages = useChatStore.getState().messages;
     if (currentMessages.length > 0 && currentMessages[0]?.chatId === chatId) {
       return;
@@ -99,14 +99,21 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
       let currentChatId = chatId || activeChatId;
       let isNewChat = false;
 
-      // If there is no existing chat, create one first
+      // ── Process attached files ──────────────────────────────────────
+      const processed = files.length > 0 ? await processFiles(files) : null;
+
+      // If only files (no text), use a generic prompt
+      const messageText =
+        text.trim() || (processed ? "Please analyze the attached file(s)." : "");
+
+      // ── Create chat if needed ───────────────────────────────────────
       if (!currentChatId) {
         try {
           const res = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              title: text.slice(0, 100),
+              title: messageText.slice(0, 100),
               language: selectedLanguage,
             }),
           });
@@ -121,9 +128,6 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           chatTitleRef.current = data.chat.title;
           isNewChat = true;
 
-          // Set chatId in store WITHOUT resetting messages.
-          // This ensures the upcoming navigation won't trigger a full
-          // setActiveChat reset (since chatId will match activeChatId).
           useChatStore.setState({ activeChatId: currentChatId });
         } catch (error) {
           console.error("[ChatContainer] Error creating chat:", error);
@@ -131,13 +135,13 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
         }
       }
 
-      // Create the user message object locally
+      // ── Create the user message locally ─────────────────────────────
       const userMessage: Message = {
         _id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         chatId: currentChatId!,
         role: "user",
-        content: text,
-        attachments: [],
+        content: messageText,
+        attachments: processed?.attachments || [],
         createdAt: new Date().toISOString(),
       };
 
@@ -158,10 +162,13 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chatId: currentChatId,
-            message: text,
+            message: messageText,
             language: selectedLanguage,
             location: city && state ? { city, state } : undefined,
-            attachments: [],
+            // File data for the LLM
+            imageDataUrls: processed?.imageDataUrls || [],
+            textContents: processed?.textContents || [],
+            attachments: processed?.attachments || [],
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -170,7 +177,6 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           const errorData = await res.json().catch(() => ({}));
           console.error("[ChatContainer] Stream error:", errorData);
           setIsStreaming(false);
-          // Still navigate if we created the chat so user can retry
           if (isNewChat && currentChatId) {
             router.push(`/chat/${currentChatId}`);
           }
@@ -203,7 +209,6 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
             const data = trimmed.slice(6);
 
             if (data === "[DONE]") {
-              // Stream complete
               break;
             }
 
@@ -220,23 +225,17 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           }
         }
 
-        // Finalize the stream
         finalizeStream(fullContent);
 
-        // Navigate to the chat page AFTER streaming is complete.
-        // This prevents the old component from unmounting mid-stream
-        // (which would abort the request and lose the response).
         if (isNewChat && currentChatId) {
           router.push(`/chat/${currentChatId}`);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") {
-          // Request was aborted intentionally
           return;
         }
         console.error("[ChatContainer] Streaming error:", error);
         setIsStreaming(false);
-        // Navigate on error so the chat is still accessible
         if (isNewChat && currentChatId) {
           router.push(`/chat/${currentChatId}`);
         }

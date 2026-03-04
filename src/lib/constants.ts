@@ -41,5 +41,14 @@ export const GROQ_MODEL = "llama-3.3-70b-versatile" as const;
 /** Lightweight Groq model for simple queries (greetings, acknowledgements, yes/no) */
 export const GROQ_MODEL_FAST = "llama-3.1-8b-instant" as const;
 
+/** Vision-capable Groq model for image analysis */
+export const GROQ_MODEL_VISION = "llama-3.2-11b-vision-preview" as const;
+
 /** Max tokens for the fast model (shorter responses for simple queries) */
 export const MAX_RESPONSE_TOKENS_FAST = 512;
+
+/** Max image dimension (longest side) before resizing on client */
+export const MAX_IMAGE_DIMENSION = 1024;
+
+/** JPEG quality for compressed image uploads (0-1) */
+export const IMAGE_UPLOAD_QUALITY = 0.85;

@@ -45,7 +45,7 @@ export function MessageList({ className }: MessageListProps) {
                 IG
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col gap-1 max-w-[75%] min-w-0 items-start">
+            <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] min-w-0 items-start">
               <div className="bg-ai-bubble text-ai-bubble-foreground rounded-2xl rounded-tl-sm px-4 py-3 break-words">
                 <MessageMarkdown content={streamingContent} />
               </div>

@@ -139,7 +139,7 @@ export function ChatInput({ onSend, disabled = false, className }: ChatInputProp
   }
 
   return (
-    <div className={cn("border-t border-border bg-white p-4", className)}>
+    <div className={cn("shrink-0 border-t border-border bg-white px-3 py-2 sm:px-4 sm:py-3", className)}>
       {/* Attached file previews */}
       {attachedFiles.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
@@ -271,8 +271,8 @@ export function ChatInput({ onSend, disabled = false, className }: ChatInputProp
         aria-hidden="true"
       />
 
-      {/* Hint text */}
-      <p className="text-[11px] text-muted-foreground mt-2 text-center">
+      {/* Hint text — hide on small screens to save space */}
+      <p className="hidden sm:block text-[11px] text-muted-foreground mt-1.5 text-center">
         Press Enter to send, Shift+Enter for new line
       </p>
     </div>

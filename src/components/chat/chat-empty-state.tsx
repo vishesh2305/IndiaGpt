@@ -54,35 +54,38 @@ export function ChatEmptyState({ className }: ChatEmptyStateProps) {
   return (
     <div
       className={cn(
-        "flex flex-1 flex-col items-center justify-center px-4 py-12",
+        "flex flex-1 flex-col items-center overflow-y-auto px-4 py-6 sm:justify-center sm:py-12",
         className
       )}
     >
       {/* Logo */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <IndiaLogo size="lg" className="items-center" />
       </div>
 
       {/* Heading */}
-      <h1 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-2">
+      <h1 className="text-xl sm:text-3xl font-bold text-foreground text-center mb-1 sm:mb-2">
         Namaste! How can I help you today?
       </h1>
 
       {/* Subtitle */}
-      <p className="text-muted-foreground text-center text-sm sm:text-base mb-10 max-w-md">
+      <p className="text-muted-foreground text-center text-xs sm:text-base mb-6 sm:mb-10 max-w-md">
         Ask me anything about India, or chat in your language
       </p>
 
-      {/* Suggestion cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-3xl">
+      {/* Suggestion cards — show 4 on mobile, all 6 on larger screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 w-full max-w-3xl">
         {suggestions.map((suggestion, index) => (
           <button
             key={index}
             onClick={() => setInputText(suggestion.text)}
-            className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-saffron hover:shadow-sm hover:bg-saffron-50/40"
+            className={cn(
+              "group flex items-start gap-3 rounded-xl border border-border bg-card p-3 sm:p-4 text-left transition-all hover:border-saffron hover:shadow-sm hover:bg-saffron-50/40",
+              index >= 4 && "hidden sm:flex"
+            )}
           >
-            <div className="flex-shrink-0 mt-0.5">{suggestion.icon}</div>
-            <span className="text-sm leading-snug text-foreground group-hover:text-foreground">
+            <div className="shrink-0 mt-0.5">{suggestion.icon}</div>
+            <span className="text-xs sm:text-sm leading-snug text-foreground group-hover:text-foreground">
               {suggestion.text}
             </span>
           </button>
