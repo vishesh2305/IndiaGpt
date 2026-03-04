@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0.014 285.823);
+  --font-sans: "Inter", "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Fira Code", ui-monospace, monospace;
+
+  /* Indian tricolor palette */
+  --color-saffron: #FF9933;
+  --color-saffron-light: #FFF5EB;
+  --color-saffron-50: #FFF8F0;
+  --color-saffron-100: #FFECD6;
+  --color-saffron-200: #FFD5A8;
+  --color-saffron-500: #FF9933;
+  --color-saffron-600: #E6871F;
+  --color-saffron-700: #CC7518;
+
+  --color-india-green: #138808;
+  --color-india-green-light: #F0F9EF;
+  --color-india-green-50: #F0FDF0;
+  --color-india-green-100: #DCFCE7;
+  --color-india-green-500: #138808;
+  --color-india-green-600: #0F6B06;
+
+  --color-navy: #000080;
+  --color-navy-light: #F0F0FF;
+  --color-navy-500: #000080;
+  --color-navy-700: #00005A;
+
+  --color-chakra-blue: #0000FF;
+
+  /* Shadcn-compatible tokens */
+  --color-primary: #FF9933;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #F5F5F4;
+  --color-secondary-foreground: #1C1917;
+  --color-accent: #FFF5EB;
+  --color-accent-foreground: #1C1917;
+  --color-muted: #F5F5F4;
+  --color-muted-foreground: #78716C;
+  --color-destructive: #EF4444;
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #E7E5E4;
+  --color-input: #E7E5E4;
+  --color-ring: #FF9933;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1C1917;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1C1917;
+
+  /* Sidebar */
+  --color-sidebar: #FAFAF9;
+  --color-sidebar-foreground: #1C1917;
+  --color-sidebar-border: #E7E5E4;
+  --color-sidebar-accent: #FFF5EB;
+  --color-sidebar-accent-foreground: #1C1917;
+
+  /* Chat bubbles */
+  --color-user-bubble: #FFF5EB;
+  --color-user-bubble-foreground: #1C1917;
+  --color-ai-bubble: #F5F5F4;
+  --color-ai-bubble-foreground: #1C1917;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6D3D1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A29E;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection color */
+::selection {
+  background-color: #FF993344;
+  color: inherit;
+}
