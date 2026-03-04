@@ -4,9 +4,29 @@ import connectDB from "@/lib/db";
 import groq from "@/lib/groq";
 import Chat from "@/models/Chat";
 import Message from "@/models/Message";
-import { GROQ_MODEL, MAX_MESSAGES_PER_REQUEST } from "@/lib/constants";
-import { buildSystemPrompt } from "@/lib/prompts";
+import {
+  GROQ_MODEL,
+  GROQ_MODEL_FAST,
+  MAX_MESSAGES_PER_REQUEST,
+  MAX_HISTORY_MESSAGE_CHARS,
+  MAX_RESPONSE_TOKENS,
+  MAX_RESPONSE_TOKENS_FAST,
+} from "@/lib/constants";
+import { buildSystemPrompt, buildCompactSystemPrompt, isSimpleQuery } from "@/lib/prompts";
 import { getLanguageName } from "@/config/languages";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Truncate a message to `MAX_HISTORY_MESSAGE_CHARS` characters.
+ * If truncated, appends an ellipsis so the model knows content was cut.
+ */
+function truncateContent(content: string): string {
+  if (content.length <= MAX_HISTORY_MESSAGE_CHARS) return content;
+  return content.slice(0, MAX_HISTORY_MESSAGE_CHARS) + "…";
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/ai/stream — Core streaming AI endpoint
@@ -59,18 +79,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── 5. Build system prompt ───────────────────────────────────────────
-    const languageName = getLanguageName(language);
-    const systemPrompt = buildSystemPrompt({
-      language,
-      languageName,
-      city: location?.city,
-      state: location?.state,
-      mode: "chat",
-      hasAttachments: attachments.length > 0,
-    });
-
-    // ── 6. Fetch conversation history (last N messages) ──────────────────
+    // ── 5. Fetch conversation history (last N messages) ──────────────────
     const historyMessages = await Message.find({ chatId })
       .sort({ createdAt: -1 })
       .limit(MAX_MESSAGES_PER_REQUEST)
@@ -79,8 +88,35 @@ export async function POST(req: NextRequest) {
     // Reverse to get chronological order
     historyMessages.reverse();
 
-    // ── 7. Save the user message to MongoDB ──────────────────────────────
-    const userMessage = await Message.create({
+    const hasHistory = historyMessages.length > 0;
+
+    // ── 6. Build system prompt ───────────────────────────────────────────
+    // On the first message we send the full Indian context (~2 000 tokens).
+    // For follow-ups the context is already established in history, so we
+    // use the compact prompt (~300 tokens) — saving ~1 700 tokens/request.
+    const languageName = getLanguageName(language);
+    const promptParams = {
+      language,
+      languageName,
+      city: location?.city,
+      state: location?.state,
+      mode: "chat" as const,
+      hasAttachments: attachments.length > 0,
+    };
+
+    const systemPrompt = hasHistory
+      ? buildCompactSystemPrompt(promptParams)
+      : buildSystemPrompt(promptParams);
+
+    // ── 7. Select model based on query complexity ────────────────────────
+    // Simple queries (greetings, yes/no, acknowledgements) use the fast 8B
+    // model which is ~80% cheaper and faster. Everything else uses 70B.
+    const useSimple = isSimpleQuery(message) && hasHistory;
+    const selectedModel = useSimple ? GROQ_MODEL_FAST : GROQ_MODEL;
+    const maxTokens = useSimple ? MAX_RESPONSE_TOKENS_FAST : MAX_RESPONSE_TOKENS;
+
+    // ── 8. Save the user message to MongoDB ──────────────────────────────
+    await Message.create({
       chatId,
       role: "user",
       content: message,
@@ -99,7 +135,10 @@ export async function POST(req: NextRequest) {
       $inc: { messageCount: 1 },
     });
 
-    // ── 8. Build the messages array for Groq ─────────────────────────────
+    // ── 9. Build the messages array for Groq ─────────────────────────────
+    // History messages are truncated to MAX_HISTORY_MESSAGE_CHARS to keep
+    // context usage predictable and avoid blowing the context window on
+    // conversations with very long messages.
     const groqMessages: Array<{
       role: "system" | "user" | "assistant";
       content: string;
@@ -107,23 +146,23 @@ export async function POST(req: NextRequest) {
       { role: "system", content: systemPrompt },
       ...historyMessages.map((msg) => ({
         role: msg.role as "user" | "assistant",
-        content: msg.content,
+        content: truncateContent(msg.content),
       })),
       { role: "user" as const, content: message },
     ];
 
-    // ── 9. Call Groq streaming API ───────────────────────────────────────
+    // ── 10. Call Groq streaming API ──────────────────────────────────────
     const startTime = Date.now();
 
     const completion = await groq.chat.completions.create({
-      model: GROQ_MODEL,
+      model: selectedModel,
       messages: groqMessages,
       stream: true,
       temperature: 0.7,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
     });
 
-    // ── 10. Stream the response as SSE ───────────────────────────────────
+    // ── 11. Stream the response as SSE ───────────────────────────────────
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -161,7 +200,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // ── 11. Send done signal first, then save to DB ────────────
+          // ── 12. Send done signal first, then save to DB ────────────
           safeEnqueue(encoder.encode("data: [DONE]\n\n"));
           safeClose();
 
@@ -174,7 +213,7 @@ export async function POST(req: NextRequest) {
             content: fullContent,
             metadata: {
               language,
-              model: GROQ_MODEL,
+              model: selectedModel,
               tokens: {
                 input: inputTokens,
                 output: outputTokens,
@@ -199,7 +238,7 @@ export async function POST(req: NextRequest) {
                 content: fullContent,
                 metadata: {
                   language,
-                  model: GROQ_MODEL,
+                  model: selectedModel,
                   latencyMs: Date.now() - startTime,
                 },
               });

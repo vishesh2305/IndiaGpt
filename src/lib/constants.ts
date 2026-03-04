@@ -26,8 +26,20 @@ export const SUPPORTED_DOC_TYPES = [
   "application/msword",
 ] as const;
 
-/** Maximum number of messages allowed in a single API request */
-export const MAX_MESSAGES_PER_REQUEST = 20;
+/** Maximum number of history messages sent to the LLM per request */
+export const MAX_MESSAGES_PER_REQUEST = 10;
 
-/** Default Groq LLM model identifier */
+/** Maximum characters per history message sent to the LLM (longer messages are truncated) */
+export const MAX_HISTORY_MESSAGE_CHARS = 500;
+
+/** Maximum tokens the LLM may generate in a single response */
+export const MAX_RESPONSE_TOKENS = 2048;
+
+/** Default Groq LLM model identifier (used for complex / substantive queries) */
 export const GROQ_MODEL = "llama-3.3-70b-versatile" as const;
+
+/** Lightweight Groq model for simple queries (greetings, acknowledgements, yes/no) */
+export const GROQ_MODEL_FAST = "llama-3.1-8b-instant" as const;
+
+/** Max tokens for the fast model (shorter responses for simple queries) */
+export const MAX_RESPONSE_TOKENS_FAST = 512;

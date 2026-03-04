@@ -388,6 +388,46 @@ export function buildVoicePrompt(params: PromptParams): string {
 }
 
 /**
+ * Build a compact system prompt used for follow-up messages in chat mode.
+ *
+ * On the first message in a conversation the full INDIA_KNOWLEDGE_CORE is
+ * sent. On subsequent messages the conversation history already establishes
+ * the Indian context, so we only send identity, language, location, and
+ * formatting rules — saving ~800 tokens per request.
+ */
+export function buildCompactSystemPrompt(params: PromptParams): string {
+  const {
+    language,
+    languageName,
+    city,
+    state,
+    hasAttachments = false,
+  } = params;
+
+  const sections = [
+    // Identity (brief)
+    `You are IndiaGPT, an AI assistant for people in India. You are culturally ` +
+      `sensitive, knowledgeable about Indian governance, geography, and daily life. ` +
+      `Use ₹ for currency with Indian numbering (lakhs/crores), DD/MM/YYYY dates, ` +
+      `kilometres, Celsius, and IST. Be respectful of India's diversity.`,
+
+    // Language
+    languageBlock(language, languageName),
+
+    // Location
+    locationBlock(city, state),
+
+    // Chat formatting (condensed)
+    `Use Markdown for clarity. Keep responses well-structured but concise.`,
+
+    // Attachments (only if present)
+    attachmentBlock(hasAttachments),
+  ];
+
+  return sections.filter(Boolean).join("\n\n");
+}
+
+/**
  * Convenience function that selects the correct prompt builder
  * based on the mode parameter.
  */
@@ -401,4 +441,59 @@ export function buildPrompt(params: PromptParams): string {
     default:
       return buildSystemPrompt(params);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Query complexity classification
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalised greeting / acknowledgement patterns.
+ *
+ * If the entire user message (lowercased, trimmed) matches one of these,
+ * it is classified as a "simple" query that can be handled by a smaller,
+ * faster model.
+ */
+const SIMPLE_PATTERNS = new Set([
+  // English greetings
+  "hi", "hello", "hey", "hii", "hiii", "yo",
+  "good morning", "good afternoon", "good evening", "good night",
+  // Hindi greetings
+  "namaste", "namaskar", "pranam",
+  // Acknowledgements
+  "ok", "okay", "k", "sure", "alright", "fine",
+  "thanks", "thank you", "thank u", "thx", "ty",
+  "dhanyavaad", "dhanyawad", "shukriya",
+  "got it", "understood", "cool", "great", "nice", "awesome",
+  // Yes / No
+  "yes", "no", "haan", "nahi", "ha", "nah", "yeah", "yep", "nope",
+  // Farewells
+  "bye", "goodbye", "good bye", "see you", "alvida",
+]);
+
+/**
+ * Determine whether a user message is "simple" — i.e. a greeting,
+ * acknowledgement, or yes/no that does not require the full 70B model.
+ *
+ * The check is intentionally conservative: any message longer than 12 words
+ * or containing a question mark is always treated as complex.
+ */
+export function isSimpleQuery(message: string): boolean {
+  const trimmed = message.trim().toLowerCase().replace(/[.!,]+$/g, "");
+  if (!trimmed) return true;
+
+  // A question mark almost certainly means a real question → complex
+  if (trimmed.includes("?")) return false;
+
+  // More than 12 words → complex
+  const wordCount = trimmed.split(/\s+/).length;
+  if (wordCount > 12) return false;
+
+  // Exact match against known simple patterns
+  if (SIMPLE_PATTERNS.has(trimmed)) return true;
+
+  // Short 1-2 word messages that are not questions are likely simple
+  if (wordCount <= 2 && !trimmed.includes("?")) return true;
+
+  return false;
 }

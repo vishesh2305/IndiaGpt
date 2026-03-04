@@ -48,6 +48,13 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
   useEffect(() => {
     if (!chatId) return;
 
+    // Skip fetch if store already has messages for this chat
+    // (happens after creating a new chat and streaming on the home page)
+    const currentMessages = useChatStore.getState().messages;
+    if (currentMessages.length > 0 && currentMessages[0]?.chatId === chatId) {
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchMessages() {
@@ -90,6 +97,7 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
       if (!text.trim() && files.length === 0) return;
 
       let currentChatId = chatId || activeChatId;
+      let isNewChat = false;
 
       // If there is no existing chat, create one first
       if (!currentChatId) {
@@ -111,9 +119,12 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           const data = await res.json();
           currentChatId = data.chat._id;
           chatTitleRef.current = data.chat.title;
+          isNewChat = true;
 
-          // Navigate to the new chat URL
-          router.push(`/chat/${currentChatId}`);
+          // Set chatId in store WITHOUT resetting messages.
+          // This ensures the upcoming navigation won't trigger a full
+          // setActiveChat reset (since chatId will match activeChatId).
+          useChatStore.setState({ activeChatId: currentChatId });
         } catch (error) {
           console.error("[ChatContainer] Error creating chat:", error);
           return;
@@ -159,12 +170,19 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
           const errorData = await res.json().catch(() => ({}));
           console.error("[ChatContainer] Stream error:", errorData);
           setIsStreaming(false);
+          // Still navigate if we created the chat so user can retry
+          if (isNewChat && currentChatId) {
+            router.push(`/chat/${currentChatId}`);
+          }
           return;
         }
 
         const reader = res.body?.getReader();
         if (!reader) {
           setIsStreaming(false);
+          if (isNewChat && currentChatId) {
+            router.push(`/chat/${currentChatId}`);
+          }
           return;
         }
 
@@ -204,6 +222,13 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
 
         // Finalize the stream
         finalizeStream(fullContent);
+
+        // Navigate to the chat page AFTER streaming is complete.
+        // This prevents the old component from unmounting mid-stream
+        // (which would abort the request and lose the response).
+        if (isNewChat && currentChatId) {
+          router.push(`/chat/${currentChatId}`);
+        }
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") {
           // Request was aborted intentionally
@@ -211,6 +236,10 @@ export function ChatContainer({ chatId = null, className }: ChatContainerProps) 
         }
         console.error("[ChatContainer] Streaming error:", error);
         setIsStreaming(false);
+        // Navigate on error so the chat is still accessible
+        if (isNewChat && currentChatId) {
+          router.push(`/chat/${currentChatId}`);
+        }
       }
     },
     [
