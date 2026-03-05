@@ -67,7 +67,7 @@ const AttachmentSchema = new Schema<IAttachment>(
   {
     url: {
       type: String,
-      required: [true, "Attachment URL is required"],
+      default: "",
     },
     type: {
       type: String,

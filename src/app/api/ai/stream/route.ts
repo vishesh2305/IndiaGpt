@@ -171,17 +171,31 @@ export async function POST(req: NextRequest) {
       ? `${systemPrompt}\n\n${searchContext}`
       : systemPrompt;
 
-    const groqMessages: GroqMessage[] = [
-      { role: "system", content: finalSystemPrompt },
+    const groqMessages: GroqMessage[] = [];
+
+    // Groq's vision model does NOT support "system" role messages alongside
+    // image content — it returns 400. For vision requests we merge the
+    // system prompt into the first user text part instead.
+    if (!hasImages) {
+      groqMessages.push({ role: "system", content: finalSystemPrompt });
+    }
+
+    groqMessages.push(
       ...historyMessages.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: truncateContent(msg.content),
-      })),
-    ];
+      }))
+    );
 
     // Build the current user message — multimodal if images are attached
     if (hasImages) {
       const contentParts: ContentPart[] = [];
+
+      // Inject system prompt as the first text part for vision requests
+      contentParts.push({
+        type: "text",
+        text: `[System Instructions]\n${finalSystemPrompt}\n\n[User Message]`,
+      });
 
       // Add text file contents as context
       if (hasTextFiles) {

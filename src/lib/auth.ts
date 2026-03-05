@@ -87,14 +87,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: (credentials.email as string).toLowerCase(),
         }).select("+password");
 
-        if (!user) {
-          throw new Error("No account found with this email");
-        }
-
-        if (!user.password) {
-          throw new Error(
-            "This account uses social login. Please sign in with Google."
-          );
+        if (!user || !user.password) {
+          return null;
         }
 
         // Basic password comparison. Replace with bcrypt.compare()
@@ -103,7 +97,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isValid = credentials.password === user.password;
 
         if (!isValid) {
-          throw new Error("Invalid password");
+          return null;
         }
 
         return {
