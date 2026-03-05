@@ -79,7 +79,7 @@ export default function MainLayout({
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main className="flex flex-1 flex-col overflow-hidden">{children}</main>
 
         {/* Mobile bottom nav: visible on mobile only */}
         <MobileBottomNav />

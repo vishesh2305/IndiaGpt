@@ -15,6 +15,7 @@ import {
 } from "@/lib/constants";
 import { buildSystemPrompt, buildCompactSystemPrompt, isSimpleQuery } from "@/lib/prompts";
 import { getLanguageName } from "@/config/languages";
+import { needsWebSearch, webSearch, formatSearchResults } from "@/lib/web-search";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -126,6 +127,19 @@ export async function POST(req: NextRequest) {
       maxTokens = MAX_RESPONSE_TOKENS_FAST;
     }
 
+    // ── 7b. Web search (if query needs real-time info) ───────────────────
+    let searchContext = "";
+    if (!hasImages && !isSimpleQuery(message) && needsWebSearch(message)) {
+      try {
+        const results = await webSearch(message, 5);
+        if (results.length > 0) {
+          searchContext = formatSearchResults(results);
+        }
+      } catch (error) {
+        console.error("[AI Stream] Web search failed:", error);
+      }
+    }
+
     // ── 8. Save user message to MongoDB ──────────────────────────────────
     await Message.create({
       chatId,
@@ -153,8 +167,12 @@ export async function POST(req: NextRequest) {
     });
 
     // ── 9. Build messages array for Groq ─────────────────────────────────
+    const finalSystemPrompt = searchContext
+      ? `${systemPrompt}\n\n${searchContext}`
+      : systemPrompt;
+
     const groqMessages: GroqMessage[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: finalSystemPrompt },
       ...historyMessages.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: truncateContent(msg.content),

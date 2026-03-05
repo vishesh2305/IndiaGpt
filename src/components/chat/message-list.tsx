@@ -21,13 +21,30 @@ export function MessageList({ className }: MessageListProps) {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const streamingBubbleRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToStream = useRef(false);
 
-  // Auto-scroll to the bottom when messages change or streaming content updates
+  // Scroll to bottom when a new user message is added (messages array changes)
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, streamingContent, isStreaming]);
+    // Reset the stream scroll flag when messages change (new message sent)
+    hasScrolledToStream.current = false;
+  }, [messages]);
+
+  // When streaming starts and first content arrives, scroll the AI bubble top into view ONCE
+  useEffect(() => {
+    if (isStreaming && streamingContent && !hasScrolledToStream.current) {
+      hasScrolledToStream.current = true;
+      if (streamingBubbleRef.current) {
+        streamingBubbleRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+    if (!isStreaming) {
+      hasScrolledToStream.current = false;
+    }
+  }, [isStreaming, streamingContent]);
 
   return (
     <ScrollArea className={cn("flex-1 h-full", className)}>
@@ -39,7 +56,7 @@ export function MessageList({ className }: MessageListProps) {
 
         {/* Streaming content */}
         {isStreaming && streamingContent && (
-          <div className="flex w-full gap-3 px-4 py-3 justify-start animate-in fade-in-0 duration-200">
+          <div ref={streamingBubbleRef} className="flex w-full gap-3 px-4 py-3 justify-start animate-in fade-in-0 duration-200">
             <Avatar className="h-8 w-8 flex-shrink-0 mt-1">
               <AvatarFallback className="bg-saffron text-white text-xs font-bold">
                 IG
